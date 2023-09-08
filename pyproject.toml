@@ -3,12 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "your project name"
+name = "model query"
 version = "0.0.1"
+dependencies = ["pandas"]
 authors = [
-  { name="autor name", email="author.email@henn.com" },
+  { name="emiliano lupo", email="emiliano.lupo@henn.com" },
 ]
-description = "A once sentece description of the package"
+description = "A library for common queries for BIM models"
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
@@ -18,5 +19,5 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/henn-dt/{package url}"
-"Bug Tracker" = "https://github.com/henn-dt/{package url}/issues"
+"Homepage" = "https://github.com/henn-dt/henn_modelquery_pkg"
+"Bug Tracker" = "https://github.com/henn-dt/henn_modelquery_pkg/issues"

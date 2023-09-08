@@ -1,0 +1,2 @@
+pandas
+git+https://github.com/henn-dt/henn_directus_pkg.git
