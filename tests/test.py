@@ -1,10 +1,10 @@
-import src.henn_modelquery_pkg.model_query as query
+import henn.model_query as query
 
 
 
 print( "create a rule with init")
 
-rule = query.Rule("material" , "equals", "STB")
+rule = query.Query("material" , "equals", "STB")
 
 print (vars(rule))
 
@@ -24,22 +24,22 @@ print("#### create a rule from dictionary")
 
 sampledict = {"name": "Rule", "param": "structure", "condition": "does not equal", "value": "MW"}
 wrongdict = {"name": "Rule", "param": "structure", "condition": "does not equal"}
-dictrule = query.Rule.from_Dict(_dict)
+dictrule = query.Query.from_Dict(_dict)
 
 print (vars(dictrule))
 
 print("#### create a rule from json")
 
-jsonrule = query.Rule.from_Json(_json)
+jsonrule = query.Query.from_Json(_json)
 print (vars(jsonrule))
 
 print("#### multiple instances")
 
 rulelist = []
 
-rulelist.append(query.Rule.from_Dict(_dict))
-rulelist.append(query.Rule.from_Dict(sampledict))
-rulelist.append(query.Rule.from_Dict(wrongdict))
+rulelist.append(query.Query.from_Dict(_dict))
+rulelist.append(query.Query.from_Dict(sampledict))
+rulelist.append(query.Query.from_Dict(wrongdict))
 
 for rule in rulelist:
     try:
@@ -131,11 +131,11 @@ print("##############################################################")
 print("#######################Rulesets###############################")
 print("")
 
-myruleset = query.Ruleset(jsonrule)
+myruleset = query.Queryset(jsonrule)
 
 print(vars(myruleset))
 
-anotherruleset = query.Ruleset([jsonrule, dictrule, query.Rule.from_Dict(sampledict)], myruleset)
+anotherruleset = query.Queryset([jsonrule, dictrule, query.Query.from_Dict(sampledict)], myruleset)
 
 print(vars(anotherruleset))
 
@@ -152,7 +152,7 @@ print (anotherruleset.as_Json())
 
 print("########################ruleset from dictionary")
 
-rulesetfromdict = query.Ruleset.from_Dict(anotherruleset.as_Dict())
+rulesetfromdict = query.Queryset.from_Dict(anotherruleset.as_Dict())
 
 print(vars(rulesetfromdict))
 
@@ -160,7 +160,7 @@ print(rulesetfromdict.as_Dict())
 
 print("ruleset from json")
 
-rulesetfromjson = query.Ruleset.from_Json(rulesetfromdict.as_Json())
+rulesetfromjson = query.Queryset.from_Json(rulesetfromdict.as_Json())
 
 print(vars(rulesetfromjson))
 

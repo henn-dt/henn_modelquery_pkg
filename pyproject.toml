@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "model query"
+name = "model_query"
 version = "0.0.1"
 dependencies = ["pandas"]
 authors = [

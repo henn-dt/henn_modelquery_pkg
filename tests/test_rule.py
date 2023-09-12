@@ -1,14 +1,14 @@
-import src.henn_modelquery_pkg.model_query as query
+import henn.model_query as query
 
 
 
 print( "create a rule with init")
 
-rule = query.Rule("material" , "equals", "STB")
+rule = query.Query("material" , "equals", "STB")
 
-anotherrule = query.Rule(prop = "value")
+anotherrule = query.Query(prop = "value")
 
-rulewithenum = query.Rule(condition=query.LabelCondition.ByValue, a=1)
+rulewithenum = query.Query(condition=query.LabelCondition.ByValue, a=1)
 
 print (vars(rule))
 
@@ -41,9 +41,9 @@ _dict = dict(rule)
 _anotherdict = anotherrule.as_Dict()
 _dichtwithenum = rulewithenum.as_Dict()
 
-_rulefromdict = query.Rule.from_Dict(_dict)
-_rulefromnotherdict = query.Rule.from_Dict(_anotherdict)
-_rulefromdictwithenum = query.Rule.from_Dict(_dichtwithenum)
+_rulefromdict = query.Query.from_Dict(_dict)
+_rulefromnotherdict = query.Query.from_Dict(_anotherdict)
+_rulefromdictwithenum = query.Query.from_Dict(_dichtwithenum)
 
 print(vars(_rulefromdict))
 print("-------------------")
@@ -54,10 +54,10 @@ print(vars(_rulefromdictwithenum))
 print("")
 print("rules from json")
 
-rulefromjson = query.Rule.from_Json(_json)
+rulefromjson = query.Query.from_Json(_json)
 
 print (vars(rulefromjson))
 
-rulewithenumfromjson = query.Rule.from_Json(rulewithenum.as_Json())
+rulewithenumfromjson = query.Query.from_Json(rulewithenum.as_Json())
 
 print(vars(rulewithenumfromjson))     # will not return Enum from specific subclass

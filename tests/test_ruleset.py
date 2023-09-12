@@ -1,4 +1,4 @@
-import src.henn_modelquery_pkg.model_query as query
+import henn.model_query as query
 
 print("##############################################################")
 print("#######################Rulesets###############################")
@@ -7,29 +7,29 @@ print("")
 
 print("some rules")
 
-myrule = query.Rule("one parameter", "equals", "one value)")
+myrule = query.Query("one parameter", "equals", "one value)")
 
 jsonfromrule = myrule.as_Json()
 
-jsonrule = query.Rule.from_Json(jsonfromrule)
+jsonrule = query.Query.from_Json(jsonfromrule)
 
 jsonrule.param = "two parameter"
 jsonrule.value = "two value"
 
 dictfromrule = myrule.as_Dict()
 
-dictrule = query.Rule.from_Dict(dictfromrule)
+dictrule = query.Query.from_Dict(dictfromrule)
 dictrule.param = "three param"
 dictrule.value = "three value"
 
 
 sampledict = dictrule.as_Dict()
 
-myruleset = query.Ruleset(jsonrule)
+myruleset = query.Queryset(jsonrule)
 
 print(vars(myruleset))
 
-anotherruleset = query.Ruleset([jsonrule, dictrule, query.Rule.from_Dict(sampledict)], myruleset)
+anotherruleset = query.Queryset([jsonrule, dictrule, query.Query.from_Dict(sampledict)], myruleset)
 
 print(vars(anotherruleset))
 
@@ -47,7 +47,7 @@ jsonruleset = anotherruleset.as_Json()
 
 print("########################ruleset from dictionary")
 
-rulesetfromdict = query.Ruleset.from_Dict(anotherruleset.as_Dict())
+rulesetfromdict = query.Queryset.from_Dict(anotherruleset.as_Dict())
 
 print(vars(rulesetfromdict))
 
@@ -55,7 +55,7 @@ print(rulesetfromdict.as_Dict())
 
 print("ruleset from json")
 
-rulesetfromjson = query.Ruleset.from_Json(jsonruleset)
+rulesetfromjson = query.Queryset.from_Json(jsonruleset)
 
 print(vars(rulesetfromjson))
 
