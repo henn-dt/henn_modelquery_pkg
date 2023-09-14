@@ -131,16 +131,13 @@ def SerializeCategories(element):
         case ModelCats.RevitCategories.Furniture | \
             ModelCats.RevitCategories.Casework:
             return ModelCats.ModelCategories.Furniture
-
-
+        case ModelCats.RevitCategories.StructuralFraming:
+            return ModelCats.ModelCategories.Beam
+        case ModelCats.RevitCategories.Ceilings:
+            return ModelCats.ModelCategories.Ceiling
 
         case _:
             return ModelCats.ModelCategories.NoCategory
-        
-        
-
-        
-
 
 
 def Serialize_fromModelDerivative( objects_tree, viewable_tree):
@@ -174,8 +171,6 @@ def Serialize_fromModelDerivative( objects_tree, viewable_tree):
 
     out = []
 
-
-
     for element in collection:
 
         vt_element = next (( e for e in viewtree \
@@ -188,13 +183,8 @@ def Serialize_fromModelDerivative( objects_tree, viewable_tree):
             serialized["properties"] = FlattenDictionary(element["properties"])
             serialized["externalId"] = element["externalId"]
             serialized["name"] = element["name"]
-
-
+            serialized["app_category"] = serialized["category"]
+            serialized["category"] = SerializeCategories(serialized)
             out.append(serialized)
-
-
-
-        
-
     
     return out
