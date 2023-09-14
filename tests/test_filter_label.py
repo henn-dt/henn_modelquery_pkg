@@ -1,4 +1,4 @@
-import henn.model_query as query
+import henn.ModelQuery as query
 
 
 print("")

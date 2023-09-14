@@ -1,26 +1,22 @@
-# henn_package_template
-A repository to use as a template for creating packages.
+# HENN Model Process
+This package contains methods for common operations performed on building models:
 
-put the code under src/project_name
-adjust the project name under devcontainer.json, pyproject.toml
+ModelCats
+- conversion of format-specific categories to a common pool of categories
+(e.g. from IfcWall and Revit Basic Wall to a common "Wall" Category.)
 
-to build the package:
+ModelQuery
+- define common query procedures for filtering and classifying elements based on their properties,
+as well as how to organize queries into systems to fully break down the input models
 
-    python3 -m build
+ModelCalc
+- common math operations performed on building elements. 
+includes methods to deal with common format transformations - from area to volume based on thickness,
+from volume to weight based on specific weights, etc. 
 
-this will create the package files, a .whl and a .tar.gz file. 
-after that push to github
 
-to use the package, add this line to the requirements.txt of your app:
+To use the package, add this line to the requirements.txt of your app:
 
     git+{url of the repo}.git
 
-
-To run tests: 
-
-- add your test file to the tests/ folder
-
-- import the modules you want to test using src.folder.module path
-
-- run tests from terminal from the project root folder:
-    python3 -m unittest tests.{test file} 
+Then import henn_modelquery_pkg in your python files. 

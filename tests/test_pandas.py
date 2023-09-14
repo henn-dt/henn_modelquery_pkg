@@ -1,5 +1,11 @@
 import pandas as pd
-import henn.model_query as query
+import henn.ModelQuery as query
+
+class MyObject():
+    def __init__(self, name = None):
+        self.name = name
+
+
 
 technologies= {
     'Category':["Spark", "PySpark", "Hadoop", "Python", "Pandas", "P and as"],
@@ -7,6 +13,11 @@ technologies= {
     'Discount':[1000, 2300, 1000, 1200, 2500, 3200],
     'Duration':['35days', '35days', '40days', '30days', '25days', '12days']
           }
+
+technologies["Object"] = []
+
+for cat in technologies["Category"]:
+    technologies["Object"].append(MyObject(cat))
 
 df = pd.DataFrame(technologies)
 
