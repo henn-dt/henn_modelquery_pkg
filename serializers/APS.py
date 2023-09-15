@@ -65,8 +65,8 @@ def unpivot_viewable_tree(viewable_tree):
                 newElement = {}
                 newElement["objectid"] = row["objectid"]
                 newElement["object"] = row["name"]
-                newElement["categoryid"] = categoryid
-                newElement["categoryname"] = category
+                newElement["categoryid"] = _categoryid
+                newElement["categoryname"] = _category
                 try:
                     newElement["category"] = ModelCats.RevitCategories[_category]
                 except:
@@ -109,16 +109,21 @@ def SerializeCategories(element):
     match category:
         case ModelCats.RevitCategories.NoCategory:
             return ModelCats.ModelCategories.NoCategory
+
         case ModelCats.RevitCategories.BasicWall:
             return ModelCats.ModelCategories.Wall
+
         case ModelCats.RevitCategories.Doors:
             return ModelCats.ModelCategories.Door
+
         case ModelCats.RevitCategories.Topography:
             return ModelCats.ModelCategories.Topography
+
         case ModelCats.RevitCategories.Fascias | \
                 ModelCats.RevitCategories.RoofSoffits |  \
                 ModelCats.RevitCategories.Roofs:
             return ModelCats.ModelCategories.Roof
+
         case ModelCats.RevitCategories.MechanicalEquipment | \
             ModelCats.RevitCategories.GenericModels:
             opening_strings = ["sud", "s+d", "bauangaben", "ausspar",
@@ -128,13 +133,41 @@ def SerializeCategories(element):
                 any(x in element["type"].lower() for x in opening_strings):
                 return ModelCats.ModelCategories.Opening
             return ModelCats.ModelCategories.GenericObject
+
         case ModelCats.RevitCategories.Furniture | \
             ModelCats.RevitCategories.Casework:
             return ModelCats.ModelCategories.Furniture
+
         case ModelCats.RevitCategories.StructuralFraming:
             return ModelCats.ModelCategories.Beam
+
         case ModelCats.RevitCategories.Ceilings:
             return ModelCats.ModelCategories.Ceiling
+
+        case ModelCats.RevitCategories.PlumbingFixtures:
+            return ModelCats.ModelCategories.PlumbingFixture
+
+        case ModelCats.RevitCategories.SlabEdges | \
+            ModelCats.RevitCategories.StructuralFoundations:
+            return ModelCats.ModelCategories.Slab
+
+        case ModelCats.RevitCategories.Floors:
+            finish_strings = ["fb", "_b" ]
+            structure_strings = ["stb", "_de"]
+            if any(x in element["type"].lower() for x in finish_strings) and \
+                all(x not in element["type"] for x in structure_strings):  
+                return ModelCats.ModelCategories.Covering
+            return ModelCats.ModelCategories.Slab
+
+        case ModelCats.RevitCategories.Railings | \
+                ModelCats.RevitCategories.TopRails | \
+                    ModelCats.RevitCategories.Handrails :
+            return ModelCats.ModelCategories.Railing
+
+        case ModelCats.RevitCategories.Stairs | \
+                    ModelCats.RevitCategories.Landings | \
+                        ModelCats.RevitCategories.Supports:
+            return ModelCats.ModelCategories.Stair
 
         case _:
             return ModelCats.ModelCategories.NoCategory
@@ -185,6 +218,10 @@ def Serialize_fromModelDerivative( objects_tree, viewable_tree):
             serialized["name"] = element["name"]
             serialized["app_category"] = serialized["category"]
             serialized["category"] = SerializeCategories(serialized)
+            serialized["element"] = serialized
+            """dumps the whole element as a property of the element itself. 
+            allows for quick retrieval of the original element after disposing of the
+            dictionary / transforming it to DataFrame"""
             out.append(serialized)
     
     return out

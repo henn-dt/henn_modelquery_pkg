@@ -8,8 +8,8 @@ class ModelCategories(Flag):
     Building = auto()
     Level = auto()
     Layer = auto()
-    Project = ()
-    Site = auto()
+    Project = auto()
+    Location = auto()
     System = auto()
     Zone = auto()
     Group = auto()
@@ -84,6 +84,7 @@ class RevitCategories(Enum):
     BasicWall = "Basic Wall"
     CurtainPanels = "Curtain Panels"
     Floors = "Floors"
+    StructuralFoundations = "Structural Foundations"
     Rooms = "Rooms"
     StructuralColumns = "Structural Columns"
     Walls = "Walls"
