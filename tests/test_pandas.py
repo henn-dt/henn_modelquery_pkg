@@ -1,5 +1,5 @@
 import pandas as pd
-import henn.ModelQuery as query
+import ModelQuery as query
 
 class MyObject():
     def __init__(self, name = None):

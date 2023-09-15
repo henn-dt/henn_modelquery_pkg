@@ -1,6 +1,6 @@
 import json
 import pandas as pd
-import henn.ModelQuery as query
+import ModelQuery as query
 
 with open("/workspaces/henn_modelquery_pkg/tests/objects_tree.json") as file:
 

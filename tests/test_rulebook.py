@@ -1,4 +1,4 @@
-import henn.ModelQuery as query
+import ModelQuery as query
 
 rule = query.Rule(query.Labelset(), "walls")
 
