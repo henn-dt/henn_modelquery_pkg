@@ -1,4 +1,5 @@
 import ModelQuery as query
+import copy
 
 print("##############################################################")
 print("#######################Rulesets###############################")
@@ -112,6 +113,10 @@ print("json from filterset")
 jsonfromfilterset = otherfilterset.as_Json()
 print(jsonfromfilterset)
 
+
+print("filterset from dict")
+print(query.Filterset.from_Dict(dictfromfilterset).as_Dict())
+
 print("")
 print("####################### LABELSets ##################################")
 print("")
@@ -146,3 +151,21 @@ print("")
 
 print(nestedlabelset.as_Json())
 
+
+print("test filtersets")
+
+redundantrule = copy.copy(myfilter)
+
+testfilterset = query.Filterset(query.Operators.All, [redundantrule, myfilter])
+
+print(testfilterset.as_Json())
+
+#checkEq = redundantrule.__eq__(myfilter)
+
+#print(checkEq)
+
+print("try to re-add an equal rule")
+
+testfilterset.queries.append(redundantrule)
+
+print(testfilterset.as_Json())

@@ -1,8 +1,8 @@
-from enum import Flag, Enum, auto
+from enum import IntFlag, Enum, auto
 
 ######## Variables and Constants #####################################
 
-class ModelCategories(Flag):
+class ModelCategories(IntFlag):
     NoCategory = 0
     """container categories"""
     Building = auto()
@@ -88,6 +88,8 @@ class RevitCategories(Enum):
     Rooms = "Rooms"
     StructuralColumns = "Structural Columns"
     Walls = "Walls"
+
+
 
 
 class IfcCategories(Enum):

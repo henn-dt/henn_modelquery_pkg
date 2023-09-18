@@ -2,6 +2,7 @@ import pandas as pd
 from enum import Flag, Enum, auto
 from typing import List, Optional, Set, Tuple, Union
 import json
+import ModelCats
 
 """
 A module that defines queries capabilites for apps that need to filter information
@@ -88,7 +89,12 @@ def enumToString(input):
         for e in input:
             output.append(enumToString(e))
 
+    elif isinstance(input, Flag):
+        _list = [name for name, member in input.__class__.__members__.items() if member in input and member != 0]
+        output = _list
+
     elif isinstance(input, Enum):
+
         output = input.name
     else:
         output = input
@@ -96,7 +102,10 @@ def enumToString(input):
     return output
 
 def dictEnumValuesToString(input : dict):
+
     for key , value in input.items():
+        if isinstance(value, dict):
+            input[key] = dictEnumValuesToString(value)
         input[key] = enumToString(value)
     return input
 
@@ -320,24 +329,33 @@ class Query:         # a parent class for performing different kind of simple qu
         self.condition = condition if condition is not None else None
         self.value = value if value is not None else None
         self.__dict__.update(**kwargs)
-
+    
     def __iter__(self):             
         for key in self.__dict__:
             yield key, getattr(self, key)
 
+#    def __repr__(self):
+#        return "this {!r} checks the parameter {!r} for the condition {!r} against the value {!r}".format(self.name, self.param, self.condition, self.value)
+    
+    def __hash__(self):
+        return hash(self.__iter__())
+    
+    def __eq__(self, other):
+        return tuple(self) == tuple(other)
+
     def as_Dict(self):
         return dict(self)
+    
+    def serializable_attr(self):
+        return (dict((i.replace(self.__class__.__name__, "").lstrip("_"), value) for i, value in self.__dict__.items()))
+
+    def as_Json_value(self):
+        output = self.as_Dict()
+        return dictEnumValuesToString(output)
+
 
     def as_Json(self):       
-        output = self.as_Dict()
-
-        dictEnumValuesToString(output)
-
-#        for key in output.keys():
-#            if isinstance(output[key], Enum):
-#                output[key] = output[key].name
-
-        return json.dumps(output)
+        return json.dumps(self.as_Json_value())
     
 
     @classmethod
@@ -432,24 +450,30 @@ class Label(Query):      # a Rule that return groups of elements based on the va
 class Queryset(Query):      # a parent class for organising multiple nested queries. Does not have solver methods on its own. 
 
     def __init__(self,  queries : List[Query] = None , querysets = None):
-        __queries = ensure_list(queries)
-        __querysets = ensure_list(querysets)
+        __queries = list(set(ensure_list(queries)))
+        __querysets = list(set(ensure_list(querysets)))
         super().__init__(param=list(set(r.param for r in __queries)), queries=__queries, querysets=__querysets)
+
+
+   
+
 
 
 #####################   Recursive methods #####################
 
     def as_Dict(self):
         output = super().as_Dict()
+
         if len(self.queries) > 0:
             output["queries"] = [r.as_Dict() for r in self.queries]
         
         if len(self.querysets) > 0:
             output["querysets"] = [queryset.as_Dict() for queryset in self.querysets]
+
         return output
     
-    def as_Json(self):
-        
+    
+    def as_Json_value(self):
         def recursiveEnumToString(queryset : dict):
             if len(queryset["querysets"]) > 0:
                 queryset["querysets"] = [recursiveEnumToString(subset) for subset in queryset["querysets"]]
@@ -460,10 +484,12 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
             
         output = self.as_Dict()
         recursiveEnumToString(output)
+        return dictEnumValuesToString(output)
 
-        dictEnumValuesToString(output)
+    
+    def as_Json(self):
 
-        return json.dumps(output)
+        return json.dumps(self.as_Json_value())
 
     
     @classmethod
@@ -471,10 +497,13 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
         prop = list(Queryset().as_Dict().keys())
 
         check_reqs(input, prop )
+
+        __querysets = None
+        if input["querysets"]:
+            __querysets = [Queryset.from_Dict(queryset) for queryset in input["querysets"]]
     
         __queries = [Query.from_Dict(r) for r in input["queries"]]
-        __querysets = [Queryset.from_Dict(queryset) for queryset in input["querysets"]]     
-     
+         
         obj = cls(__queries, __querysets)
 
         for key, value in input.items():
@@ -509,15 +538,48 @@ class Filterset(Queryset):       # a ruleset for performing nested filter operat
         if queries is not None:
             test = queries if isinstance(queries, list) else [queries]
             if not all(isinstance(r, Filter) for r in test):
-                return "input queries are not Filters"
+                pass
+                raise "input queries are not Filters"
         
         if querysets is not None:
             test = [_ruleset.queries for _ruleset in querysets] if isinstance(querysets, list) else querysets.queries
             if not all(isinstance(r, Filter) for r in test):
-                return "input queries within querysets are not all Filters"
+                pass
+                # raise "input queries within querysets are not all Filters"
 
         super().__init__(queries, querysets)
         self.condition = __condition
+
+
+    @classmethod
+    def from_Dict(cls, input):
+        prop = list(Filterset().as_Dict().keys())
+
+        check_reqs(input, prop )
+
+        __querysets = None
+        if input["querysets"]:
+            __querysets = [Filterset.from_Dict(queryset) for queryset in input["querysets"]]
+    
+        __queries = [Filter.from_Dict(r) for r in input["queries"]]
+         
+        obj = cls(input["condition"], __queries, __querysets)
+
+        for key, value in input.items():
+            if key in prop:
+                continue
+            setattr(obj, key, value)
+
+        return obj
+
+    @classmethod
+    def from_Json(cls, input):
+        obj = super().from_Json(input)
+
+        if not isinstance(obj.condition, Operators):
+            obj.condition = Operators[obj.condition]
+
+        return obj
 
 
 class Labelset(Queryset):
@@ -554,11 +616,9 @@ def AnalyseSet(_data, _set):
 
             def checkout(exit = False, msg = ""):
                 if msg != "" : print(msg)
-                print("checking out with output:" , _output)
+
                 if _output is None or exit is True:
-                    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                    print ("returning an empty dataframe")
-                    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                    """returning an empty dataframe"""
                     return _input.head(0)
                 return _output
 
@@ -588,20 +648,12 @@ def AnalyseSet(_data, _set):
             # recursive logic for nested filtersets:
              
             if len(qset.querysets) > 0:
-                print("")
-                print("starting to check nested rulesets: ", qset.querysets)
                 nestedResults = [] 
                 
                 for _qset in qset.querysets:
-                    print ("checking nested ruleset: ", _qset.as_Json())
-                    print("")
                     result = analyseFilterSet(_qset)
-                    print("result of nested ruleset check: ", result)
                     nestedResults.append(result)
-                
-                print("result of nested rulesets is: ", nestedResults)
                     
-
                 _output = aggregate(nestedResults)
 
                 # solve aggregate results
@@ -613,21 +665,14 @@ def AnalyseSet(_data, _set):
 
             if len(qset.queries) >0:
                 for q in qset.queries:
-                    print("checking rule: ", q.as_Json())
                     result = q.analyse(_input)
-                    print("result of check is:", result)
                     queriesResults.append(result)
             
-            print("result of all the queries is: ", queriesResults)
-            
-            print("aggregating")
             _output = aggregate(queriesResults)
-            print("output after aggregating: ", _output)
 
             # returns a dataframe
             result = checkout()
             return result
-
 
 
 
@@ -649,8 +694,6 @@ def AnalyseSet(_data, _set):
             case _:
                 return analyseSingleValue()
         
-
-
 
     def analyseLabelSet():
 
@@ -674,12 +717,122 @@ def AnalyseSet(_data, _set):
 
 class Rule:
     """a rule contains a single Queryset (including Labelsets or Filtersets), optional categories, and a target group """
-    def __init__(self, ruleset, categories, group = None):
-        self.ruleset = ruleset
+    def __init__(self, query, categories : ModelCats.ModelCategories = ModelCats.ModelCategories.NoCategory, group = None):
+        self.name = str(self.__class__.__name__)
+        self.query = query
         self.categories = categories
         self.group = group if group is not None else None
-        self.type = type(self.ruleset).__name__
+        self.type = str(self.query.__class__.__name__)
 
+    def __iter__(self):             
+        for key in self.__dict__:
+            yield key, getattr(self, key)
+
+#    def __repr__(self):
+#        return "this {!r} checks the ruleset {!r} for the category {!r} and assigns results to the group {!r}".format(self.name, self.ruleset, self.categories, self.group)
+    
+    def __hash__(self):
+        return hash(self.__iter__())
+    
+    def __eq__(self, other):
+        return tuple(self) == tuple(other)
+               
+    def serializable_attr(self):
+        return (dict((i.replace(self.__class__.__name__, "").lstrip("_"), value) for i, value in self.__dict__.items()))
+    
+    def as_Dict(self):
+        return dict(self)
+
+    def as_Json_value(self):       
+        output = self.as_Dict()
+        for key, value in output.items():
+            if isinstance(value, Query):
+                output[key] = value.as_Json_value()
+        return dictEnumValuesToString(output)
+
+
+    def as_Json(self):
+        return json.dumps(self.as_Json_value())
     
 
+    @classmethod
+    def from_Dict(cls, input):    
+        """
+        method to create a rule from a dictionary string
+        input = the dictionary. must contain a "ruleset", a "categories", and a "group" key.
+        """
 
+        prop = list(Rule(Queryset()).as_Dict().keys())
+                
+        check_reqs(input, prop)                
+        obj = cls(input["query"])
+
+        for key, value in input.items():
+            if key == "name":
+                continue
+            setattr(obj, key, value)
+
+        return obj
+
+
+    @classmethod
+    def from_Json(cls, input):
+        """
+        method to create a rule from a json string
+        input = the json string. must contain a "query", a "categories", and a "group" key.
+        """
+        error = "input is not a valid json"
+
+        try:
+            input = json.loads(input)
+        except Exception as err:
+            print(error + str(err.args))
+            return 
+        
+        obj = cls.from_Dict(input)
+        
+        if not isinstance(obj.categories, ModelCats.ModelCategories):
+            _cats = obj.categories if isinstance(obj.categories, list) else [obj.categories]
+            _enums = None
+            for c in _cats:                
+                _enums = ModelCats.ModelCategories[c] if _enums == None else _enums | ModelCats.ModelCategories[c]
+            obj.categories = _enums
+        
+        if not isinstance(obj.query, Queryset):
+            match obj.query["name"]:
+                case "Filterset":
+                    obj.query = Filterset().from_Json(obj.query)
+                case "Labelset":
+                    obj.query = Labelset().from_Json(obj.query)
+                case "Queryset":
+                    obj.query = Queryset().from_Json(obj.query)
+                case _:
+                    pass
+            
+
+        return obj
+    
+
+class RuleConnection:
+    """a class that describe a relationship between two Rules. This would be an Edge in a Graph."""
+    def __init__(self, source : Rule, target : Rule):
+        self.source = source
+        self.target = target
+
+
+class Rulebook:
+    """a class that contains several rules and their relationships to each other"""
+    def __init__(self, rules : List[Rule] , connections : List[RuleConnection] = None):
+        self.rules = ensure_list(rules)
+        self.connections = ensure_list(connections) if connections is not None else None
+
+    @property
+    def graph(self):
+        if self.connections is None:
+            return None
+        __graph = {}
+        for r in self.rules:
+            __graph[r] = []
+        for c in self.connections:
+            if c.source in __graph:
+                list(set(__graph[c.source].append(c.target)))
