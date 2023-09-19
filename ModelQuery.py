@@ -1,8 +1,10 @@
+import sys
 import pandas as pd
 from enum import Flag, Enum, auto
 from typing import List, Optional, Set, Tuple, Union
 import json
 import ModelCats
+
 
 """
 A module that defines queries capabilites for apps that need to filter information
@@ -364,11 +366,9 @@ class Query:         # a parent class for performing different kind of simple qu
         method to create a rule from a dictionary string
         input = the dictionary. must contain a "param", a "condition", and a "value" key.
         """
-
-        prop = list(Query().as_Dict().keys())
-                
-        check_reqs(input, prop)
-                
+        _class = getattr(sys.modules[__name__], input["name"])()
+        prop = list(_class.as_Dict().keys())                
+        check_reqs(input, prop)                
         obj = cls()
 
         for key, value in input.items():
@@ -388,7 +388,7 @@ class Query:         # a parent class for performing different kind of simple qu
         error = "input is not a valid json"
 
         try:
-            input = json.loads(input)
+            input = json.loads(str(input))
         except Exception as err:
             print(error + str(err.args))
             return 
@@ -491,20 +491,29 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
 
         return json.dumps(self.as_Json_value())
 
-    
     @classmethod
     def from_Dict(cls, input):
-        prop = list(Queryset().as_Dict().keys())
+
+        _class = getattr(sys.modules[__name__], input["name"])()
+
+        prop = list(_class.as_Dict().keys())
 
         check_reqs(input, prop )
-
-        __querysets = None
-        if input["querysets"]:
-            __querysets = [Queryset.from_Dict(queryset) for queryset in input["querysets"]]
-    
-        __queries = [Query.from_Dict(r) for r in input["queries"]]
          
-        obj = cls(__queries, __querysets)
+        __querysets = None
+        if "querysets" in input:
+            for q in input["querysets"]:
+                _qclass = getattr(sys.modules[__name__], q["name"])()
+                __querysets = [_qclass.from_Dict(queryset) for queryset in input["querysets"]]
+
+
+        __queries = None
+        for q in input["queries"]:
+            _qclass = getattr(sys.modules[__name__], q["name"])()
+            __queries = [_qclass.from_Dict(query) for query in input["queries"]]
+
+
+        obj = cls(queries = __queries, querysets = __querysets)
 
         for key, value in input.items():
             if key in prop:
@@ -518,7 +527,7 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
         error = "input is not a valid json"
 
         try:
-            input = json.loads(input)
+            input = json.loads(str(input))
         except Exception as err:
             print(error + str(err.args))
             return   
@@ -539,7 +548,7 @@ class Filterset(Queryset):       # a ruleset for performing nested filter operat
             test = queries if isinstance(queries, list) else [queries]
             if not all(isinstance(r, Filter) for r in test):
                 pass
-                raise "input queries are not Filters"
+ #               raise "input queries are not Filters"
         
         if querysets is not None:
             test = [_ruleset.queries for _ruleset in querysets] if isinstance(querysets, list) else querysets.queries
@@ -550,36 +559,42 @@ class Filterset(Queryset):       # a ruleset for performing nested filter operat
         super().__init__(queries, querysets)
         self.condition = __condition
 
-
+  
     @classmethod
     def from_Dict(cls, input):
-        prop = list(Filterset().as_Dict().keys())
-
-        check_reqs(input, prop )
-
-        __querysets = None
-        if input["querysets"]:
-            __querysets = [Filterset.from_Dict(queryset) for queryset in input["querysets"]]
-    
-        __queries = [Filter.from_Dict(r) for r in input["queries"]]
-         
-        obj = cls(input["condition"], __queries, __querysets)
-
-        for key, value in input.items():
-            if key in prop:
-                continue
-            setattr(obj, key, value)
-
+        obj = super().from_Dict(input)
+        obj.condition = input["condition"]
         return obj
-
+    
     @classmethod
     def from_Json(cls, input):
-        obj = super().from_Json(input)
+    
+        error = "input is not a valid json"
 
-        if not isinstance(obj.condition, Operators):
-            obj.condition = Operators[obj.condition]
+        try:
+            input = json.loads(str(input))
+        except Exception as err:
+            print(error + str(err.args))
+            return  
+        
+        def fsetToEnum(input):
+            input["condition"] = Operators[input["condition"]]
 
-        return obj
+            if "queryset" in input and input["querysets"] is not []:
+                for qset in input["querysets"]:
+                    qset = fsetToEnum(qset)
+
+            if "queries" in input and input["queries"] is not []:
+                for q in input["queries"]:
+                    q["condition"] = FilterCondition[q["condition"]]
+            
+            return input
+        
+        """ convert strings to enums """        
+        input = fsetToEnum(input)
+
+
+        return cls.from_Dict(input)
 
 
 class Labelset(Queryset):
@@ -589,14 +604,58 @@ class Labelset(Queryset):
         if queries is not None:
             test = queries if isinstance(queries, list) else [queries]
             if not all(isinstance(r, Label) for r in test):
-                return print("input queries are not Label")
+                pass
+
         
         if querysets is not None:
             test = [_ruleset.queries for _ruleset in querysets] if isinstance(querysets, list) else querysets.queries
             if not all(isinstance(r, Label) for r in test):
-                return print("input queries within querysets are not all Label")
+                pass
+
             
         super().__init__(queries, querysets)
+
+    @classmethod
+    def from_Dict(cls, input):
+        obj = super().from_Dict(input)
+        obj.param = input["param"]
+        obj.condition = input["condition"]
+        return obj
+    
+
+
+    @classmethod
+    def from_Json(cls, input):
+    
+        error = "input is not a valid json"
+
+        try:
+            input = json.loads(str(input))
+        except Exception as err:
+            print(error + str(err.args))
+            return  
+        
+        def fsetToEnum(input):
+
+
+            if "queryset" in input and input["querysets"] is not []:
+                for qset in input["querysets"]:
+                    qset = fsetToEnum(qset)
+
+            if "queries" in input and input["queries"] is not []:
+                for q in input["queries"]:
+                    q["param"] = Labels[q["param"]]
+                    q["condition"] = LabelCondition[q["condition"]]
+            
+            return input
+        
+        """ convert strings to enums """        
+        input = fsetToEnum(input)
+
+
+        return cls.from_Dict(input)
+
+
 
 
 ######################################## Set Methods #######################################################
@@ -759,7 +818,7 @@ class Rule:
     def from_Dict(cls, input):    
         """
         method to create a rule from a dictionary string
-        input = the dictionary. must contain a "ruleset", a "categories", and a "group" key.
+        input = the dictionary. must contain a "query", a "categories", and a "group" key.
         """
 
         prop = list(Rule(Queryset()).as_Dict().keys())
@@ -784,11 +843,12 @@ class Rule:
         error = "input is not a valid json"
 
         try:
-            input = json.loads(input)
+            input = json.loads(str(input))
         except Exception as err:
             print(error + str(err.args))
             return 
         
+
         obj = cls.from_Dict(input)
         
         if not isinstance(obj.categories, ModelCats.ModelCategories):
@@ -797,15 +857,17 @@ class Rule:
             for c in _cats:                
                 _enums = ModelCats.ModelCategories[c] if _enums == None else _enums | ModelCats.ModelCategories[c]
             obj.categories = _enums
+
         
         if not isinstance(obj.query, Queryset):
+            _query = json.dumps(input["query"])
             match obj.query["name"]:
                 case "Filterset":
-                    obj.query = Filterset().from_Json(obj.query)
+                    obj.query = Filterset().from_Json(_query)
                 case "Labelset":
-                    obj.query = Labelset().from_Json(obj.query)
+                    obj.query = Labelset().from_Json(_query)
                 case "Queryset":
-                    obj.query = Queryset().from_Json(obj.query)
+                    obj.query = Queryset().from_Json(_query)
                 case _:
                     pass
             
@@ -819,20 +881,110 @@ class RuleConnection:
         self.source = source
         self.target = target
 
+    @classmethod
+    def from_rules_and_index(cls, rules, source : int = 0, target : int = 1):       
+        return cls(rules[int(source)], rules[int(target)])
+
+
+        
+
 
 class Rulebook:
     """a class that contains several rules and their relationships to each other"""
-    def __init__(self, rules : List[Rule] , connections : List[RuleConnection] = None):
-        self.rules = ensure_list(rules)
-        self.connections = ensure_list(connections) if connections is not None else None
+    def __init__(self, rules : List[Rule] = None, connections : List[RuleConnection] = None):
+        self.rules = ensure_list(rules) if rules is not None else []
+        self.connections = ensure_list(connections) if connections is not None else []
 
     @property
     def graph(self):
-        if self.connections is None:
-            return None
+        if self.connections is []:
+            return {}
         __graph = {}
         for r in self.rules:
-            __graph[r] = []
+            __graph[self.rules.index(r)] = []
         for c in self.connections:
-            if c.source in __graph:
-                list(set(__graph[c.source].append(c.target)))
+            if self.rules.index(c.source) in __graph:
+                __graph[self.rules.index(c.source)].append(self.rules.index(c.target))
+        return __graph
+
+    def __iter__(self):             
+        for key in self.__dict__:
+            yield key, getattr(self, key)
+
+#    def __repr__(self):
+#        return "this {!r} checks the parameter {!r} for the condition {!r} against the value {!r}".format(self.name, self.param, self.condition, self.value)
+    
+    def __hash__(self):
+        return hash(self.__iter__())
+    
+    def __eq__(self, other):
+        return tuple(self) == tuple(other)
+
+    def as_Dict(self):
+        return dict(self)
+    
+    def serializable_attr(self):
+        return (dict((i.replace(self.__class__.__name__, "").lstrip("_"), value) for i, value in self.__dict__.items()))
+
+    def as_Json_value(self):
+        output = {}
+        output["rules"] = [rule.as_Json_value() for rule in self.rules]
+        output["graph"] = self.graph
+
+        return output
+
+    def as_Json(self):       
+        return json.dumps(self.as_Json_value())
+
+    @classmethod
+    def from_Dict(cls, input):
+        """
+        method to create a rule from a dictionary string
+        input = the dictionary. must contain a "rules" key.
+        """
+
+        prop = list(Rulebook().as_Dict().keys())
+                
+        check_reqs(input, prop)                
+        obj = cls(input["rules"])
+
+        for key, value in input.items():
+            if key == "name":
+                continue
+            setattr(obj, key, value)
+
+        return obj
+    
+    @classmethod
+    def from_Json(cls, input):
+        """
+        method to create a rule from a json string
+        input = the json string. must contain a "query", a "categories", and a "group" key.
+        """
+        error = "input is not a valid json"
+
+        try:
+            input = json.loads(str(input))
+        except Exception as err:
+            print(error + str(err.args))
+            return 
+
+        obj = cls()
+
+        for r in input["rules"]:
+            obj.rules.append(Rule.from_Json(json.dumps(r)))
+
+        print(input)
+        print(type(input))
+
+        print(input["graph"])
+        print(type(input["graph"]))
+
+        for source, targets in input["graph"].items():
+            if targets == []:
+                continue
+            for target in targets:
+                obj.connections.append(RuleConnection.from_rules_and_index(obj.rules, source, target))
+
+        return obj        
+

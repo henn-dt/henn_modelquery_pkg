@@ -32,6 +32,41 @@ print("rule from json")
 
 jsonfromRule = myotherrule.as_Json()
 
+print(jsonfromRule)
+
 RuleFromJson = query.Rule.from_Json(jsonfromRule)
 
-print(RuleFromJson)
+print(RuleFromJson.as_Dict())
+
+print(RuleFromJson.as_Json())
+
+print("")
+print ("now rulebooks")
+print("")
+
+rulebook = query.Rulebook(RuleFromJson)
+
+print(rulebook.as_Dict())
+
+print(rulebook.graph)
+
+
+print(rulebook.as_Json())
+
+
+print("adding connections")
+
+OtherRule = query.Rule(query.Labelset())
+
+rulebook = query.Rulebook([RuleFromJson, OtherRule])
+
+rulebook.connections.append(query.RuleConnection(rulebook.rules[0], rulebook.rules[1]))
+
+print(rulebook.as_Dict())
+
+print("")
+print(rulebook.as_Json())
+
+print("rulebook from json")
+
+print(query.Rulebook.from_Json(rulebook.as_Json()).as_Dict())

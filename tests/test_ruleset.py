@@ -8,7 +8,7 @@ print("")
 
 print("some rules")
 
-myrule = query.Query("one parameter", "equals", "one value)")
+myrule = query.Query("one parameter", "ValueEquals", "one value)")
 
 jsonfromrule = myrule.as_Json()
 
@@ -117,6 +117,10 @@ print(jsonfromfilterset)
 print("filterset from dict")
 print(query.Filterset.from_Dict(dictfromfilterset).as_Dict())
 
+
+print("filterset from json")
+print(query.Filterset.from_Json(jsonfromfilterset).as_Dict())
+
 print("")
 print("####################### LABELSets ##################################")
 print("")
@@ -142,6 +146,15 @@ print("")
 
 print(nestedlabelset.as_Dict())
 
+
+print("##################################")
+print("")
+print("labelssets from dics")
+
+labelsetFromDict = query.Labelset.from_Dict(nestedlabelset.as_Dict())
+
+print(labelsetFromDict.as_Dict())
+
 print("")
 print("labelssets as jsons")
 
@@ -150,6 +163,15 @@ print(mylabelset.as_Json())
 print("")
 
 print(nestedlabelset.as_Json())
+
+
+print("")
+print("labelsets from json")
+print("")
+
+labelsetfromJson = query.Labelset.from_Json(nestedlabelset.as_Json())
+
+print(labelsetfromJson.as_Dict())
 
 
 print("test filtersets")
