@@ -45,6 +45,6 @@ res_price = pd.merge(res_disc, res_fee, how = "inner")
 
 #print(pd.merge(res_cat, res_price, how = "outer"))
 
-result = query.AnalyseSet(df, filter_set)
+result = filter_set.Analyse(df)
 
-print(result.describe())
+print(result)

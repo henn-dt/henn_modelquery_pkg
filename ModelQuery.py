@@ -131,7 +131,7 @@ def check_reqs(input, reqs):
 ################################# BASE QUERY FUNCTIONS ##########################################################
 
 
-def filterDataframe(input : pd.DataFrame , param,  criteria:FilterCondition, value, inplace = False):
+def filterDataframe(input : pd.DataFrame , param,  condition:FilterCondition, value, inplace = False):
     """
     Filters a pandas dataframe based on a single filter condition
     Returns a new dataframe with only the elements that pass the filter.
@@ -141,7 +141,7 @@ def filterDataframe(input : pd.DataFrame , param,  criteria:FilterCondition, val
 #    _value = repr(value) if " " in value else value
     _param = param
     _value = value
-    match(FilterCondition(criteria)):
+    match(FilterCondition(condition)):
         case FilterCondition.NoCondition:
             return True
         
@@ -246,9 +246,9 @@ def filterDataframe(input : pd.DataFrame , param,  criteria:FilterCondition, val
 
 
 
-def filterValue(input , criteria:FilterCondition, value):
+def filterValue(input , condition:FilterCondition, value):
     """ given an input value, a criteria, and a value or list of values, returns true if the input fulfills the criteria """
-    match(FilterCondition(criteria)):
+    match(FilterCondition(condition)):
         case FilterCondition.NoCondition:
             return True
         case FilterCondition.ValueEquals:
@@ -300,24 +300,47 @@ def filterValue(input , criteria:FilterCondition, value):
                 return True
             return False
 
-def labelDataframe(input : pd.DataFrame, label : Labels, criteria:LabelCondition , value = None):
-    """return groupby items of the input Dataframe, based on Labels (column) and criteria """
-    match(LabelCondition(criteria)):
+def labelDataframe(input : pd.DataFrame, label : Labels, condition:LabelCondition , value = None):
+    """
+    returns a dictionary of dataframes, 
+    where key is a tuple ( 'label_value' , )
+    and value is a dataframe with the grouped elements.
+
+    Parameters:
+    input : the dataframe to be analysed
+    label : the argument to group by. accept single values or lists. converts Enums to their .name
+    condition (enum.LabelCondition): the condition to group by
+    value : for criterias that need to specify a value, the required value. 
+    """
+    label = label if isinstance(label, list) else [label]
+    labelby = [l.name if isinstance(l, Enum) else l for l in label]
+    match(LabelCondition(condition)):
         case LabelCondition.NoCondition:
-            return input
+            return { tuple() : input }
         case LabelCondition.ByValue:
-            return input.groupby([label.name], group_keys=True, sort=False, dropna=False)
+
+            return dict(tuple(input.groupby(labelby,  sort=False, dropna=False)))
+        
         case LabelCondition.ByStartingCharacter:
-            i = value - 1 if isinstance(value, int) else 0
-            i = i if i >= 0 else 0
-            input["compare"] = input.label.str[0:i]
-            return labelDataframe(input, "compare", LabelCondition.ByValue)
+            _labelby = []
+            for l in labelby:
+                _label = "compare_{0}".format(l)
+                _labelby.append(_label)
+                i = value - 1 if isinstance(value, int) else 0
+                i = i if i >= 0 else 0
+                input[_label] = input.l.str[0:i]
+            return labelDataframe(input, _labelby, LabelCondition.ByValue)
+        
         case LabelCondition.ByEndingCharacter:
-            i = value - 1 if isinstance(value, int) else 0
-            i = i if i >= 0 else 0
-            string = input.label.str
-            input["compare"] = string[len(string)- i - 1 : len(string)]
-            return labelDataframe(input, "compare", LabelCondition.ByValue)   
+            _labelby = []
+            for l in labelby:
+                _label = "compare_{0}".format(l)
+                _labelby.append(_label)                
+                i = value - 1 if isinstance(value, int) else 0
+                i = i if i >= 0 else 0
+                string = input.l.str
+                input[_label] = string[len(string)- i - 1 : len(string)]
+            return labelDataframe(input, _labelby, LabelCondition.ByValue)   
 
 
 ################################ END OF BASE QUERY FUNCTIONS ####################################################
@@ -455,10 +478,6 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
         super().__init__(param=list(set(r.param for r in __queries)), queries=__queries, querysets=__querysets)
 
 
-   
-
-
-
 #####################   Recursive methods #####################
 
     def as_Dict(self):
@@ -533,6 +552,173 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
             return   
 
         return cls.from_Dict(input)
+    
+######################################## Set Methods #######################################################
+
+    def Analyse(self, _data, inplace = False):
+        """main method to analyse a Filterset or Labelset. """
+        _input = _data
+        _query = self
+
+        def analyseFilterSet(qset):
+        
+            def analyseDataFrame():
+                _output = None
+
+                def checkout(exit = False, msg = ""):
+                    if msg != "" : print(msg)
+
+                    if _output is None or exit is True:
+                        """returning an empty dataframe"""
+                        return _input.head(0)
+                    return _output
+
+                def aggregate(l : List[pd.DataFrame]):
+                    if len(l) == 0:
+                        return checkout(True, msg = "aggregate list has length 0")
+
+                    match qset.condition:
+                        case Operators.Any:
+                            MergeHow = "outer"
+                            if all(len(x) == 0 for x in l ):
+                                return checkout(True, msg = "outer join has length 0")                        
+                        case Operators.All:
+                            MergeHow = "inner"
+                            if any(len(x) == 0 for x in l ):
+                                return checkout(True, msg = "inner join has length 0")
+
+                    out = l[0]
+                    for d in l[1:]:
+                        out = out.merge(d, how = MergeHow) 
+                        
+                    if len(out) == 0 and qset.condition is Operators.All:
+                        return checkout(True, msg = "inner join has length 0")
+                    return out
+
+                
+                # recursive logic for nested filtersets:
+                
+                if len(qset.querysets) > 0:
+                    nestedResults = [] 
+                    
+                    for _qset in qset.querysets:
+                        result = analyseFilterSet(_qset)
+                        nestedResults.append(result)
+                        
+                    _output = aggregate(nestedResults)
+
+                    # solve aggregate results
+                    if qset.condition == Operators.All and _output is None:
+                        return checkout(True, msg = "output is empty")
+
+                # check queries
+                queriesResults = [] if _output is None else [_output]
+
+                if len(qset.queries) >0:
+                    for q in qset.queries:
+                        result = q.analyse(_input, inplace)           # here the filtering happens
+                        queriesResults.append(result)
+                
+                _output = aggregate(queriesResults)
+
+                # returns a dataframe
+                result = checkout()
+                return result
+
+
+
+            def analyseSingleValue():
+                _output = None
+
+                # helper functions
+
+                def checkout(exit = False, msg = ""):
+                    if msg != "" : print(msg)
+
+                    if _output is None or exit is True:
+                        """returning false"""
+                        return False
+                    return _output
+
+                def aggregate(l : List[bool]):
+                    if len(l) == 0:
+                        return checkout(True, msg = "aggregate list has length 0")
+
+                    match qset.condition:
+                        case Operators.Any:
+                            if True not in l:
+                                return checkout(True, msg = "all values are False")                        
+                        case Operators.All:
+                            if False in l:
+                                return checkout(True, msg = "some values are False")
+
+                # recursive logic
+
+                if len(qset.querysets) > 0:
+                    nestedResults = [] 
+                    
+                    for _qset in qset.querysets:
+                        result = analyseFilterSet(_qset)
+                        nestedResults.append(result)
+                        
+                    _output = aggregate(nestedResults)
+
+                # solve aggregate results
+                    if qset.condition == Operators.All and _output is None:
+                        return checkout(True, msg = "output is empty")            
+                
+
+                # check rules
+
+                queriesResults = [] if _output is None else [_output]
+
+                if len(qset.queries) >0:
+                    for q in qset.queries:
+                        result = q.analyse(_input)
+                        queriesResults.append(result)
+                
+                _output = aggregate(queriesResults)
+
+                # aggregate
+
+
+                # return True or False
+                result = checkout()
+                return result
+
+
+            match _input:
+                case pd.DataFrame():
+                    result = analyseDataFrame()
+                    return result
+                case _:
+                    return analyseSingleValue()
+            
+
+        def analyseLabelSet(labelby = None, execute = True):
+
+            # nested labelset are mostly important for the order of operations. In the end a single operation should be performed on the "topmost" labelset
+
+            # recursive logic
+            if not execute:
+                return labelby
+            
+            # group by
+            results = "some smart thing"
+
+            # return groups 
+            return results
+
+        match _query:
+            case Labelset():
+                return analyseLabelSet(_query)
+            case Filterset():
+                print("analyse Filterset")
+                result = analyseFilterSet(_query)
+                print("result of analysis")
+                print(result)
+                return result
+
     
 
 
@@ -658,118 +844,6 @@ class Labelset(Queryset):
 
 
 
-######################################## Set Methods #######################################################
-
-def AnalyseSet(_data, _set):
-    """main method to analyse a Filterset or Labelset. """
-    _input = _data
-    _query = _set
-
-    
-
-    def analyseFilterSet(qset):
-    
-        def analyseDataFrame():
-            _output = None
-
-
-            def checkout(exit = False, msg = ""):
-                if msg != "" : print(msg)
-
-                if _output is None or exit is True:
-                    """returning an empty dataframe"""
-                    return _input.head(0)
-                return _output
-
-            def aggregate(l : List[pd.DataFrame]):
-                if len(l) == 0:
-                    return checkout(True, msg = "aggregate list has length 0")
-
-                match qset.condition:
-                    case Operators.Any:
-                        MergeHow = "outer"
-                        if all(len(x) == 0 for x in l ):
-                            return checkout(True, msg = "outer join has length 0")                        
-                    case Operators.All:
-                        MergeHow = "inner"
-                        if any(len(x) == 0 for x in l ):
-                            return checkout(True, msg = "inner join has length 0")
-
-                out = l[0]
-                for d in l[1:]:
-                    out = out.merge(d, how = MergeHow) 
-                    
-                if len(out) == 0 and qset.condition is Operators.All:
-                    return checkout(True, msg = "inner join has length 0")
-                return out
-
-            
-            # recursive logic for nested filtersets:
-             
-            if len(qset.querysets) > 0:
-                nestedResults = [] 
-                
-                for _qset in qset.querysets:
-                    result = analyseFilterSet(_qset)
-                    nestedResults.append(result)
-                    
-                _output = aggregate(nestedResults)
-
-                # solve aggregate results
-                if qset.condition == Operators.All and output is None:
-                    return checkout(True, msg = "output is empty")
-
-            # check queries
-            queriesResults = [] if _output is None else [_output]
-
-            if len(qset.queries) >0:
-                for q in qset.queries:
-                    result = q.analyse(_input)
-                    queriesResults.append(result)
-            
-            _output = aggregate(queriesResults)
-
-            # returns a dataframe
-            result = checkout()
-            return result
-
-
-
-        def analyseSingleValue():
-            def aggregate():
-                pass
-            
-            # recursive logic
-            # check rules
-            # aggregate
-            # return True or False
-
-            pass
-
-        match _input:
-            case pd.DataFrame():
-                result = analyseDataFrame()
-                return result
-            case _:
-                return analyseSingleValue()
-        
-
-    def analyseLabelSet():
-
-        # recursive logic
-        # group by
-        # return groups
-        pass
-
-    match _query:
-        case Labelset():
-            return analyseLabelSet(_query)
-        case Filterset():
-            print("analyse Filterset")
-            result = analyseFilterSet(_query)
-            print("result of analysis")
-            print(result)
-            return result
 
 
 ######################################## Rules and Rulebook #################################################
@@ -891,9 +965,10 @@ class RuleConnection:
 
 class Rulebook:
     """a class that contains several rules and their relationships to each other"""
-    def __init__(self, rules : List[Rule] = None, connections : List[RuleConnection] = None):
+    def __init__(self, rules : List[Rule] = None, connections : List[RuleConnection] = None, inplace = False):
         self.rules = ensure_list(rules) if rules is not None else []
         self.connections = ensure_list(connections) if connections is not None else []
+        self.inplace = inplace
 
     @property
     def graph(self):
@@ -973,12 +1048,6 @@ class Rulebook:
 
         for r in input["rules"]:
             obj.rules.append(Rule.from_Json(json.dumps(r)))
-
-        print(input)
-        print(type(input))
-
-        print(input["graph"])
-        print(type(input["graph"]))
 
         for source, targets in input["graph"].items():
             if targets == []:
