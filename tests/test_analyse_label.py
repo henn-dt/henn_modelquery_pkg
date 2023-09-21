@@ -23,9 +23,29 @@ technologies["Object"] = []
 for cat in technologies["Category"]:
     technologies["Object"].append(MyObject(cat))
 
-label = query.Label([query.Labels.Category, "Fee", query.Labels.Category ] , query.LabelCondition.ByValue)
+df = pd.DataFrame(technologies)
+
+label = query.Label(query.Labels.Category , query.LabelCondition.ByValue)
 
 groups = label.analyse(technologies)
 
 print("groups")
 print(groups)
+
+
+print("now a labelset")
+
+label2 = query.Label(query.Labels.CostGroup, query.LabelCondition.ByValue)
+
+labelset = query.Labelset(label)
+
+labelset2 = query.Labelset(label2)
+
+labelset.querysets.append(labelset2)
+
+print(labelset.as_Dict())
+print(labelset.as_Json())
+
+results = labelset.Analyse(df)
+
+print(results)

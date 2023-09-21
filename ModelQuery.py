@@ -3,8 +3,6 @@ import pandas as pd
 from enum import Flag, Enum, auto
 from typing import List, Optional, Set, Tuple, Union
 import json
-import ModelCats
-
 
 """
 A module that defines queries capabilites for apps that need to filter information
@@ -68,8 +66,6 @@ future conditions to implement:
     ByMatch = auto()
 """
 
-  
-
 
 class Operators (Enum):
     All = 1
@@ -82,7 +78,6 @@ def ensure_list(s: Optional[Union[str, List[str], Tuple[str], Set[str]]]) -> Lis
     """works for string and list/tuple/sets of strings. converts None to an empty list"""
     # Ref: https://stackoverflow.com/a/56641168/
     return s if isinstance(s, list) else list(s) if isinstance(s, (tuple, set)) else [] if s is None else [s]
-
 
 def enumToString(input):
     output = []
@@ -111,7 +106,6 @@ def dictEnumValuesToString(input : dict):
         input[key] = enumToString(value)
     return input
 
-
 def check_reqs(input, reqs):
     properties = ensure_list(reqs)
     error = "input doesn't have the required keys"    
@@ -124,6 +118,7 @@ def check_reqs(input, reqs):
 
     if len(missingkeys) > 0:
         return error + "(" + str(missingkeys) + ")"
+
 
 ################################# END OF HELPERS ################################################################
 
@@ -244,8 +239,6 @@ def filterDataframe(input : pd.DataFrame , param,  condition:FilterCondition, va
         case FilterCondition.ValueIsNone:
             return input.query("{0}isnull()".format(_param))
 
-
-
 def filterValue(input , condition:FilterCondition, value):
     """ given an input value, a criteria, and a value or list of values, returns true if the input fulfills the criteria """
     match(FilterCondition(condition)):
@@ -300,51 +293,46 @@ def filterValue(input , condition:FilterCondition, value):
                 return True
             return False
 
-def labelDataframe(input : pd.DataFrame, label : Labels, condition:LabelCondition , value = None):
-    """
-    returns a dictionary of dataframes, 
-    where key is a tuple ( 'label_value' , )
-    and value is a dataframe with the grouped elements.
+def addLabelColumnToDataFrame(input : pd.DataFrame, label : Labels, condition:LabelCondition , value = None):
 
-    Parameters:
-    input : the dataframe to be analysed
-    label : the argument to group by. accept single values or lists. converts Enums to their .name
-    condition (enum.LabelCondition): the condition to group by
-    value : for criterias that need to specify a value, the required value. 
-    """
     label = label if isinstance(label, list) else [label]
     labelby = [l.name if isinstance(l, Enum) else l for l in label]
+
     match(LabelCondition(condition)):
         case LabelCondition.NoCondition:
-            return { tuple() : input }
-        case LabelCondition.ByValue:
-
-            return dict(tuple(input.groupby(labelby,  sort=False, dropna=False)))
-        
+            pass
+        case LabelCondition.ByValue:   
+            pass
         case LabelCondition.ByStartingCharacter:
             _labelby = []
             for l in labelby:
-                _label = "compare_{0}".format(l)
+                _label = "label_{0}".format(l)
                 _labelby.append(_label)
                 i = value - 1 if isinstance(value, int) else 0
                 i = i if i >= 0 else 0
                 input[_label] = input.l.str[0:i]
-            return labelDataframe(input, _labelby, LabelCondition.ByValue)
+            labelby = _labelby
         
         case LabelCondition.ByEndingCharacter:
             _labelby = []
             for l in labelby:
-                _label = "compare_{0}".format(l)
+                _label = "label_{0}".format(l)
                 _labelby.append(_label)                
                 i = value - 1 if isinstance(value, int) else 0
                 i = i if i >= 0 else 0
                 string = input.l.str
                 input[_label] = string[len(string)- i - 1 : len(string)]
-            return labelDataframe(input, _labelby, LabelCondition.ByValue)   
+            labelby = _labelby
+            
+    return input , labelby
+         
+def labelDataframe(input : pd.DataFrame, label : Labels, condition:LabelCondition , value = None):
 
+    input, labelby = addLabelColumnToDataFrame(input, label, condition, value)
+
+    return dict(tuple(input.groupby(labelby,  sort=False, dropna=False)))
 
 ################################ END OF BASE QUERY FUNCTIONS ####################################################
-
 
 class Query:         # a parent class for performing different kind of simple queries
 
@@ -354,6 +342,15 @@ class Query:         # a parent class for performing different kind of simple qu
         self.condition = condition if condition is not None else None
         self.value = value if value is not None else None
         self.__dict__.update(**kwargs)
+    
+    @property
+    def param(self):
+        return self._param
+    
+    @param.setter
+    def param(self, value):
+        self._param = value
+        
     
     def __iter__(self):             
         for key in self.__dict__:
@@ -369,7 +366,7 @@ class Query:         # a parent class for performing different kind of simple qu
         return tuple(self) == tuple(other)
 
     def as_Dict(self):
-        return dict(self)
+        return {'name' : self.name, 'param' : self.param, 'condition' : self.condition, 'value' : self.value}
     
     def serializable_attr(self):
         return (dict((i.replace(self.__class__.__name__, "").lstrip("_"), value) for i, value in self.__dict__.items()))
@@ -472,22 +469,28 @@ class Label(Query):      # a Rule that return groups of elements based on the va
 
 class Queryset(Query):      # a parent class for organising multiple nested queries. Does not have solver methods on its own. 
 
-    def __init__(self,  queries : List[Query] = None , querysets = None):
-        __queries = list(set(ensure_list(queries)))
-        __querysets = list(set(ensure_list(querysets)))
-        super().__init__(param=list(set(r.param for r in __queries)), queries=__queries, querysets=__querysets)
+    def __init__(self,  queries : List[Query] = [] , querysets = []):
 
+        super().__init__()
+
+        self.queries = list(set(ensure_list(queries)))
+        self.querysets = list(set(ensure_list(querysets)))
+
+    @Query.param.getter
+    def param(self):
+        params = [q.param for q in self.queries] if self.queries is not [] else []
+        params += [q.param for q in self.querysets] if self.querysets is not [] else []
+        output = []
+        [output.append(p) for p in params if p not in output]
+        return output
 
 #####################   Recursive methods #####################
 
     def as_Dict(self):
         output = super().as_Dict()
-
-        if len(self.queries) > 0:
-            output["queries"] = [r.as_Dict() for r in self.queries]
         
-        if len(self.querysets) > 0:
-            output["querysets"] = [queryset.as_Dict() for queryset in self.querysets]
+        output["queries"] = [r.as_Dict() for r in self.queries] if len(self.queries) > 0 else []
+        output["querysets"] = [queryset.as_Dict() for queryset in self.querysets] if len(self.querysets) > 0 else []
 
         return output
     
@@ -553,7 +556,8 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
 
         return cls.from_Dict(input)
     
-######################################## Set Methods #######################################################
+######################## Analyse Set Methods ##########################
+######################## Recursion Ahoy ###############################
 
     def Analyse(self, _data, inplace = False):
         """main method to analyse a Filterset or Labelset. """
@@ -695,33 +699,67 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
                     return analyseSingleValue()
             
 
-        def analyseLabelSet(labelby = None, execute = True):
+        def analyseLabelSet(_input, qset, labelby = None, execute = True):
+            # if nested labelset all share the same condition, they are then only important for the order of operations.
+            # in this case the recursive process should just collect the params and add them to the params of the topmost label and
+            # perform a single groupby. 
+            # if the nested labels have different conditions, then the nested labels need to add sorting columns to the dataset.  
+            # 
+            # nested labelset are mostly important for the order of operations. 
+            # In the end a single groupby operation should be performed on the "topmost" labelset. By adding labelling columns the topmost
+            # operation is a simple "groupby" by a list of columns. 
 
-            # nested labelset are mostly important for the order of operations. In the end a single operation should be performed on the "topmost" labelset
+#            print("running analyse on labelset set to {0}".format(execute))
+            labelby = [] if labelby is None else labelby
+
 
             # recursive logic
+            if len(qset.querysets) > 0:
+                for q in qset.querysets:
+                    _input, labelby = analyseLabelSet(_input, q, labelby, False)
+                
+            
+            # enriches the dataframe and defines the new labelby
+
+            if len(qset.queries) > 0:
+                for q in qset.queries:
+                    _input, _labelby = addLabelColumnToDataFrame(_input, q.param, q.condition, q.value)
+ #                   print("input is {0} and labelby is {1}".format(_input, _labelby))
+
+                    labelby += _labelby
+
+
+
+#                    print("list before uniq is {0}".format(labelby))
+
+
+            # return labelby and updated dataset 
             if not execute:
-                return labelby
+                return _input, labelby
+            
+#            print("label by {0}".format(labelby))
             
             # group by
-            results = "some smart thing"
+            result = labelDataframe(_input, labelby, LabelCondition.ByValue)
 
-            # return groups 
-            return results
+            # return results
+            return result
 
         match _query:
             case Labelset():
-                return analyseLabelSet(_query)
+                print("analyse Labelset")
+                result = analyseLabelSet(_input, _query)
+
+
+
             case Filterset():
                 print("analyse Filterset")
                 result = analyseFilterSet(_query)
-                print("result of analysis")
-                print(result)
-                return result
+
+
+        return result
 
     
-
-
 
 class Filterset(Queryset):       # a ruleset for performing nested filter operations, using an Operator (and, or, ...) to aggregate results
 
@@ -840,220 +878,3 @@ class Labelset(Queryset):
 
 
         return cls.from_Dict(input)
-
-
-
-
-
-
-######################################## Rules and Rulebook #################################################
-
-class Rule:
-    """a rule contains a single Queryset (including Labelsets or Filtersets), optional categories, and a target group """
-    def __init__(self, query, categories : ModelCats.ModelCategories = ModelCats.ModelCategories.NoCategory, group = None):
-        self.name = str(self.__class__.__name__)
-        self.query = query
-        self.categories = categories
-        self.group = group if group is not None else None
-        self.type = str(self.query.__class__.__name__)
-
-    def __iter__(self):             
-        for key in self.__dict__:
-            yield key, getattr(self, key)
-
-#    def __repr__(self):
-#        return "this {!r} checks the ruleset {!r} for the category {!r} and assigns results to the group {!r}".format(self.name, self.ruleset, self.categories, self.group)
-    
-    def __hash__(self):
-        return hash(self.__iter__())
-    
-    def __eq__(self, other):
-        return tuple(self) == tuple(other)
-               
-    def serializable_attr(self):
-        return (dict((i.replace(self.__class__.__name__, "").lstrip("_"), value) for i, value in self.__dict__.items()))
-    
-    def as_Dict(self):
-        return dict(self)
-
-    def as_Json_value(self):       
-        output = self.as_Dict()
-        for key, value in output.items():
-            if isinstance(value, Query):
-                output[key] = value.as_Json_value()
-        return dictEnumValuesToString(output)
-
-
-    def as_Json(self):
-        return json.dumps(self.as_Json_value())
-    
-
-    @classmethod
-    def from_Dict(cls, input):    
-        """
-        method to create a rule from a dictionary string
-        input = the dictionary. must contain a "query", a "categories", and a "group" key.
-        """
-
-        prop = list(Rule(Queryset()).as_Dict().keys())
-                
-        check_reqs(input, prop)                
-        obj = cls(input["query"])
-
-        for key, value in input.items():
-            if key == "name":
-                continue
-            setattr(obj, key, value)
-
-        return obj
-
-
-    @classmethod
-    def from_Json(cls, input):
-        """
-        method to create a rule from a json string
-        input = the json string. must contain a "query", a "categories", and a "group" key.
-        """
-        error = "input is not a valid json"
-
-        try:
-            input = json.loads(str(input))
-        except Exception as err:
-            print(error + str(err.args))
-            return 
-        
-
-        obj = cls.from_Dict(input)
-        
-        if not isinstance(obj.categories, ModelCats.ModelCategories):
-            _cats = obj.categories if isinstance(obj.categories, list) else [obj.categories]
-            _enums = None
-            for c in _cats:                
-                _enums = ModelCats.ModelCategories[c] if _enums == None else _enums | ModelCats.ModelCategories[c]
-            obj.categories = _enums
-
-        
-        if not isinstance(obj.query, Queryset):
-            _query = json.dumps(input["query"])
-            match obj.query["name"]:
-                case "Filterset":
-                    obj.query = Filterset().from_Json(_query)
-                case "Labelset":
-                    obj.query = Labelset().from_Json(_query)
-                case "Queryset":
-                    obj.query = Queryset().from_Json(_query)
-                case _:
-                    pass
-            
-
-        return obj
-    
-
-class RuleConnection:
-    """a class that describe a relationship between two Rules. This would be an Edge in a Graph."""
-    def __init__(self, source : Rule, target : Rule):
-        self.source = source
-        self.target = target
-
-    @classmethod
-    def from_rules_and_index(cls, rules, source : int = 0, target : int = 1):       
-        return cls(rules[int(source)], rules[int(target)])
-
-
-        
-
-
-class Rulebook:
-    """a class that contains several rules and their relationships to each other"""
-    def __init__(self, rules : List[Rule] = None, connections : List[RuleConnection] = None, inplace = False):
-        self.rules = ensure_list(rules) if rules is not None else []
-        self.connections = ensure_list(connections) if connections is not None else []
-        self.inplace = inplace
-
-    @property
-    def graph(self):
-        if self.connections is []:
-            return {}
-        __graph = {}
-        for r in self.rules:
-            __graph[self.rules.index(r)] = []
-        for c in self.connections:
-            if self.rules.index(c.source) in __graph:
-                __graph[self.rules.index(c.source)].append(self.rules.index(c.target))
-        return __graph
-
-    def __iter__(self):             
-        for key in self.__dict__:
-            yield key, getattr(self, key)
-
-#    def __repr__(self):
-#        return "this {!r} checks the parameter {!r} for the condition {!r} against the value {!r}".format(self.name, self.param, self.condition, self.value)
-    
-    def __hash__(self):
-        return hash(self.__iter__())
-    
-    def __eq__(self, other):
-        return tuple(self) == tuple(other)
-
-    def as_Dict(self):
-        return dict(self)
-    
-    def serializable_attr(self):
-        return (dict((i.replace(self.__class__.__name__, "").lstrip("_"), value) for i, value in self.__dict__.items()))
-
-    def as_Json_value(self):
-        output = {}
-        output["rules"] = [rule.as_Json_value() for rule in self.rules]
-        output["graph"] = self.graph
-
-        return output
-
-    def as_Json(self):       
-        return json.dumps(self.as_Json_value())
-
-    @classmethod
-    def from_Dict(cls, input):
-        """
-        method to create a rule from a dictionary string
-        input = the dictionary. must contain a "rules" key.
-        """
-
-        prop = list(Rulebook().as_Dict().keys())
-                
-        check_reqs(input, prop)                
-        obj = cls(input["rules"])
-
-        for key, value in input.items():
-            if key == "name":
-                continue
-            setattr(obj, key, value)
-
-        return obj
-    
-    @classmethod
-    def from_Json(cls, input):
-        """
-        method to create a rule from a json string
-        input = the json string. must contain a "query", a "categories", and a "group" key.
-        """
-        error = "input is not a valid json"
-
-        try:
-            input = json.loads(str(input))
-        except Exception as err:
-            print(error + str(err.args))
-            return 
-
-        obj = cls()
-
-        for r in input["rules"]:
-            obj.rules.append(Rule.from_Json(json.dumps(r)))
-
-        for source, targets in input["graph"].items():
-            if targets == []:
-                continue
-            for target in targets:
-                obj.connections.append(RuleConnection.from_rules_and_index(obj.rules, source, target))
-
-        return obj        
-

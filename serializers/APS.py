@@ -106,11 +106,13 @@ def SerializeCategories(element):
         return
     if type(category) is not ModelCats.RevitCategories:
         return
-    match category:
+    match element["app_category"]:
         case ModelCats.RevitCategories.NoCategory:
             return ModelCats.ModelCategories.NoCategory
 
-        case ModelCats.RevitCategories.BasicWall:
+        case ModelCats.RevitCategories.BasicWall | \
+            ModelCats.RevitCategories.Walls | \
+            ModelCats.RevitCategories.WallSweeps :
             return ModelCats.ModelCategories.Wall
 
         case ModelCats.RevitCategories.Doors:

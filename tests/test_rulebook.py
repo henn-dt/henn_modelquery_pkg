@@ -1,12 +1,13 @@
 import ModelQuery as query
 import ModelCats as cats
+from Core import *
 
 
 myLabelSet = query.Labelset(query.Label(query.Labels.Category))
 
 print(myLabelSet.as_Json())
 
-myrule = query.Rule(myLabelSet, cats.ModelCategories.Beam)
+myrule = Rule(myLabelSet, cats.ModelCategories.Beam)
 
 print(myrule.as_Json())
 
@@ -16,7 +17,7 @@ print (myFilterSet.as_Json())
 
 mycats = cats.ModelCategories.Ceiling | cats.ModelCategories.Beam
 
-myotherrule = query.Rule(myFilterSet, mycats)
+myotherrule = Rule(myFilterSet, mycats)
 
 print(myotherrule.as_Dict())
 
@@ -24,7 +25,7 @@ print(myotherrule.as_Json())
 
 ruleAsDict = myotherrule.as_Dict()
 
-ruleFromDict = query.Rule.from_Dict(ruleAsDict)
+ruleFromDict = Rule.from_Dict(ruleAsDict)
 
 print(ruleFromDict.as_Dict())
 
@@ -34,7 +35,7 @@ jsonfromRule = myotherrule.as_Json()
 
 print(jsonfromRule)
 
-RuleFromJson = query.Rule.from_Json(jsonfromRule)
+RuleFromJson = Rule.from_Json(jsonfromRule)
 
 print(RuleFromJson.as_Dict())
 
@@ -44,7 +45,7 @@ print("")
 print ("now rulebooks")
 print("")
 
-rulebook = query.Rulebook(RuleFromJson)
+rulebook = Rulebook(RuleFromJson)
 
 print(rulebook.as_Dict())
 
@@ -56,11 +57,11 @@ print(rulebook.as_Json())
 
 print("adding connections")
 
-OtherRule = query.Rule(query.Labelset())
+OtherRule = Rule(query.Labelset())
 
-rulebook = query.Rulebook([RuleFromJson, OtherRule])
+rulebook = Rulebook([RuleFromJson, OtherRule])
 
-rulebook.connections.append(query.RuleConnection(rulebook.rules[0], rulebook.rules[1]))
+rulebook.connections.append(RuleConnection(rulebook.rules[0], rulebook.rules[1]))
 
 print(rulebook.as_Dict())
 
@@ -69,4 +70,6 @@ print(rulebook.as_Json())
 
 print("rulebook from json")
 
-print(query.Rulebook.from_Json(rulebook.as_Json()).as_Dict())
+print(Rulebook.from_Json(rulebook.as_Json()).as_Dict())
+
+print(rulebook.param)
