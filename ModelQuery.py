@@ -37,6 +37,7 @@ class FilterCondition(Enum):
 
 
 class Labels (Enum):
+    """properties common to almost any model. Each element to be filtered should have these properties - be enriched with "NaN" if needed"""
     NoLabel = 0
     Model = auto()
     Category = auto()
@@ -64,6 +65,7 @@ future conditions to implement:
     ByInterval = auto()
     Value should be either a single number or a list of numbers. If no value is provided, will group by positive and negatives values
     ByMatch = auto()
+    Will group elements that match any of the criteria, and produce one spillover group for "unmatched" elements
 """
 
 

@@ -1,11 +1,12 @@
 from ModelQuery import *
 from ModelCats import *
+from ModelCalc import *
 
 ######################################## Rules and Rulebook #################################################
 
 class Rule:
     """a rule contains a single Queryset (including Labelsets or Filtersets), optional categories, and a target calculation group """
-    def __init__(self, query : Queryset, categories : ModelCategories = ModelCategories.NoCategory, group = None):
+    def __init__(self, query : Queryset, categories : ModelCategories = ModelCategories.NoCategory, group : CalcGroup = None):
         self.name = str(self.__class__.__name__)
         self.__query = query
         self.categories = categories
@@ -106,6 +107,32 @@ class Rule:
         return obj
     
 
+    def Analyse(self, input : pd.DataFrame):
+        """
+        base method to analyse a rule and all its underlying qsets.
+        returns a Ledger(Dataframe) of elements.
+        if a CalcGroup is defined, enriches the LedgerItems in the Ledger with the calculated value.
+        """
+        output = pd.DataFrame()
+
+        # filters out categories
+        if not self.categories == ModelCategories.NoCategory:
+            pass
+
+        # analyses according to qset
+        if self.type == "Queryset" :
+            pass
+        else:
+            output = self.query.Analyse(input)
+
+        # runs the calculation
+        if self.group is not None:
+            output = self.group.Calculate(output)
+
+        return output
+
+    
+
 class RuleConnection:
     """a class that describe a relationship between two Rules. This would be an Edge in a Graph."""
     def __init__(self, source : Rule, target : Rule):
@@ -118,10 +145,16 @@ class RuleConnection:
 
 class Rulebook:
     """a class that contains several rules and their relationships to each other"""
-    def __init__(self, rules : List[Rule] = None, connections : List[RuleConnection] = None, inplace = False):
+    def __init__(self, rules : List[Rule] = None, connections : List[RuleConnection] = None, inplace = True):
         self.rules = ensure_list(rules) if rules is not None else []
         self.connections = ensure_list(connections) if connections is not None else []
         self.inplace = inplace
+        """
+        rules are checked in a given order, following the connections. 
+        if inplace is True, checked elements will be assigned to all groups for which they trigger a Query.
+        if inplace is False, every checked rule will generate a new Ledger (DataFrame) which includes only the elements not yet assigned to a Group.
+        Within a connection branch, elements that are deeper down the branch will be prioritised when assigning Groups to elements. 
+        """
 
     @property
     def graph(self):
@@ -218,3 +251,4 @@ class Rulebook:
                 obj.connections.append(RuleConnection.from_rules_and_index(obj.rules, source, target))
 
         return obj        
+
