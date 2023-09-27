@@ -863,7 +863,6 @@ class Labelset(Queryset):
         
         def fsetToEnum(input):
 
-
             if "queryset" in input and input["querysets"] is not []:
                 for qset in input["querysets"]:
                     qset = fsetToEnum(qset)
@@ -877,6 +876,5 @@ class Labelset(Queryset):
         
         """ convert strings to enums """        
         input = fsetToEnum(input)
-
 
         return cls.from_Dict(input)
