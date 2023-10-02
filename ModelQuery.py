@@ -492,20 +492,28 @@ class Queryset(Query):      # a parent class for organising multiple nested quer
         output = super().as_Dict()
         
         output["queries"] = [r.as_Dict() for r in self.queries] if len(self.queries) > 0 else []
-        output["querysets"] = [queryset.as_Dict() for queryset in self.querysets] if len(self.querysets) > 0 else []
+        output["querysets"] = [queryset.as_Dict() for queryset in self.querysets] if len(self.querysets) > 0 else []    # this is not really recursive though. all classes have valids _dict_ though, so it works.
 
         return output
     
     
     def as_Json_value(self):
+
+
+
         def recursiveEnumToString(queryset : dict):
+
             if len(queryset["querysets"]) > 0:
                 queryset["querysets"] = [recursiveEnumToString(subset) for subset in queryset["querysets"]]
-            if len(output["queries"]) > 0:
+
+            if len(queryset["queries"]) > 0:
                 queryset["queries"] = [dictEnumValuesToString(rule) for rule in queryset["queries"]]
+
             dictEnumValuesToString(queryset)
+
             return queryset
             
+
         output = self.as_Dict()
         recursiveEnumToString(output)
         return dictEnumValuesToString(output)
